@@ -125,7 +125,44 @@ def analyze_image_with_bedrock(image_path, bedrock_client, model_id=DEFAULT_MODE
         
         # Default prompt if none provided
         if not prompt:
-            prompt = "Describe what you see in this image in a concise way, focusing on the main subjects, setting, and action."
+            prompt = """
+Bạn là chuyên gia hàng đầu về phân tích hình ảnh và nhận diện sản phẩm Vinamilk trong môi trường bán lẻ.
+Bạn sẽ được xem một loạt hình ảnh trích xuất từ video quay tại các điểm bán hàng.
+Trong ảnh có các sản phẩm Vinamilk (hộp sữa, chai sữa, lon sữa, sữa chua) được trưng bày theo nhiều cách: đóng gói thành khay/pack, xếp chồng trên kệ, hoặc đặt riêng lẻ.
+TRƯỚC KHI PHÂN TÍCH, HÃY XỬ LÝ HÌNH ẢNH:
+1. Xoay hình ảnh theo đúng chiều của sản phẩm để nhìn rõ nhất nhãn hiệu
+2. Tăng độ tương phản để phân biệt rõ text và hình ảnh trên bao bì
+3. Zoom vào các vùng chứa thông tin quan trọng (tên sản phẩm, giá, khuyến mãi)
+4. Điều chỉnh độ sáng để tối ưu khả năng đọc thông tin
+5. Khử nhiễu và làm sắc nét các chi tiết nhỏ trên bao bì
+YÊU CẦU PHÂN TÍCH CHI TIẾT:
+1. Đếm chính xác tổng số sản phẩm Vinamilk có thể nhìn thấy MẶT TRƯỚC trong ảnh (không tính sản phẩm chỉ nhìn thấy mặt bên hoặc mặt sau)
+2. Nhận diện và phân loại các dòng sản phẩm Vinamilk khác nhau (sữa tươi, sữa chua, sữa đặc, sữa bột...)
+3. Đếm số stack cho mỗi loại sản phẩm (stack = số lượng sản phẩm cùng loại xếp ở HÀNG DƯỚI CÙNG khi nhìn trực diện vào kệ)
+4. Trích xuất giá gốc chính xác (thường là giá có gạch ngang hoặc in nhỏ)
+5. Trích xuất giá khuyến mãi (thường được in đậm hoặc có kích thước lớn hơn)
+6. Xác định thời gian áp dụng khuyến mãi (ngày bắt đầu - ngày kết thúc)
+7. Mô tả chi tiết màu sắc chủ đạo và phụ của bao bì sản phẩm
+ĐỊNH DẠNG KẾT QUẢ:
+Trả về kết quả dưới dạng mảng JSON, mỗi phần tử đại diện cho^A một loại sản phẩm Vinamilk kh nhau trong ảnh:
+[
+  {
+    "label_name": "<tên chính xác của dòng sản phẩm> + <màu sắc chủ đạo>",
+    "total_stacks": <số lượng stack>,
+    "product_detail": "<thông tin chi tiết: thể tích/khối lượng, loại sản phẩm, đặc tính nổi bật>",
+    "origin_price": "<giá gốc đầy đủ bao gồm đơn vị tiền tệ>",
+    "discount_price": "<giá khuyến mãi đầy đủ bao gồm đơn vị tiền tệ>",
+    "promotion_period": "<thời gian áp dụng khuyến mãi, định dạng DD/MM-DD/MM/YYYY>"
+  },
+  {
+    // Sản phẩm tiếp theo
+  }
+]
+CHÚ Ý QUAN TRỌNG:
+- Nếu không thấy rõ thông tin nào, ghi "Không xác định" vào trường tương ứng
+- Phân biệt rõ các dòng sản phẩm khác nhau dù có bao bì tương tự
+- Chỉ trả về JSON, không thêm bất kỳ giải thích hay mô tả nào khác
+- Đảm bảo JSON hợp lệ và đầy đủ thông tin theo yêu cầu"""
         
         # Prepare request body
         body = json.dumps({

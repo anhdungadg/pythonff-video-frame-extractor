@@ -9,8 +9,13 @@ Chương trình Python này cho phép người dùng trích xuất một tỷ l�
 ## Tính năng
 
 - Trích xuất frame từ video theo tỷ lệ phần trăm được chỉ định
-- Phát hiện cảnh cắt trong video bằng phương pháp cơ bản hoặc mô hình Nova Pro
+- Phát hiện cảnh cắt trong video bằng nhiều phương pháp:
+  - Phương pháp cơ bản (pixel difference)
+  - Mô hình Nova Pro (embedding similarity)
+  - AWS Bedrock với Claude (semantic analysis)
 - Phân tích frame bằng AWS Bedrock với mô hình Claude
+- Hỗ trợ nhiều mô hình Claude khác nhau (Sonnet, Haiku)
+- Hỗ trợ prompt tùy chỉnh cho phân tích hình ảnh
 - Giao diện web thân thiện với người dùng sử dụng Streamlit
 - Tự động tạo thư mục đầu ra nếu chưa tồn tại
 - Hiển thị thông tin về video (tổng số frame, FPS)
@@ -41,23 +46,23 @@ pip install -r requirements.txt
 #### Trích xuất frame theo tỷ lệ phần trăm
 
 ```bash
-python frame_extractor.py đường_dẫn_video thư_mục_lưu_frame tỷ_lệ_phần_trăm
+python frame_extractor.py đường_dẫn_video thư_mục_lưu_frame tỷ_lệ_phần_trăm [--analyze] [--model MODEL_ID] [--prompt-file PROMPT_FILE]
 ```
 
 #### Phát hiện cảnh cắt và trích xuất frame
 
 ```bash
-python scene_detector.py đường_dẫn_video thư_mục_lưu_frame [--method phương_pháp] [--threshold ngưỡng] [--min_scene_length độ_dài_tối_thiểu]
+python scene_detector.py đường_dẫn_video thư_mục_lưu_frame [--method phương_pháp] [--threshold ngưỡng] [--min_scene_length độ_dài_tối_thiểu] [--model MODEL_ID]
 ```
 
 #### Sử dụng giao diện thống nhất
 
 ```bash
-python main.py extract đường_dẫn_video thư_mục_lưu_frame tỷ_lệ_phần_trăm [--analyze]
+python main.py extract đường_dẫn_video thư_mục_lưu_frame tỷ_lệ_phần_trăm [--analyze] [--model MODEL_ID] [--prompt-file PROMPT_FILE]
 ```
 
 ```bash
-python main.py detect đường_dẫn_video thư_mục_lưu_frame [--method phương_pháp] [--threshold ngưỡng] [--min_scene_length độ_dài_tối_thiểu]
+python main.py detect đường_dẫn_video thư_mục_lưu_frame [--method phương_pháp] [--threshold ngưỡng] [--min_scene_length độ_dài_tối_thiểu] [--model MODEL_ID]
 ```
 
 ### Giao diện web với Streamlit
@@ -70,7 +75,9 @@ Sau khi chạy lệnh trên, giao diện web sẽ được mở trong trình duy
 1. Tải lên video
 2. Chọn chế độ trích xuất frame hoặc phát hiện cảnh cắt
 3. Điều chỉnh các tham số
-4. Xem kết quả trực quan
+4. Chọn mô hình Claude để sử dụng
+5. Nhập prompt tùy chỉnh cho phân tích hình ảnh
+6. Xem kết quả trực quan
 
 ## Tham số
 
@@ -79,6 +86,8 @@ Sau khi chạy lệnh trên, giao diện web sẽ được mở trong trình duy
 - `thư_mục_lưu_frame`: Thư mục để lưu các frame được trích xuất
 - `tỷ_lệ_phần_trăm`: Tỷ lệ phần trăm số frame cần trích xuất (từ 0 đến 100)
 - `--analyze`: Phân tích các frame đã trích xuất bằng AWS Bedrock
+- `--model`: ID của mô hình AWS Bedrock cần sử dụng (mặc định: anthropic.claude-3-sonnet-20240229-v1:0)
+- `--prompt-file`: Đường dẫn đến file chứa prompt tùy chỉnh cho phân tích hình ảnh
 
 ### Phát hiện cảnh cắt
 - `đường_dẫn_video`: Đường dẫn đến file video cần phát hiện cảnh cắt
@@ -87,6 +96,12 @@ Sau khi chạy lệnh trên, giao diện web sẽ được mở trong trình duy
 - `--threshold`: Ngưỡng phát hiện cảnh cắt (0-255 cho phương pháp basic, 0-1 cho phương pháp nova_pro và bedrock)
 - `--min_scene_length`: Số frame tối thiểu giữa các cảnh cắt
 - `--sample_rate`: Xử lý mỗi n frame (chỉ cho phương pháp bedrock)
+- `--model`: ID của mô hình AWS Bedrock cần sử dụng (chỉ cho phương pháp bedrock)
+
+## Mô hình AWS Bedrock được hỗ trợ
+
+- `anthropic.claude-3-sonnet-20240229-v1:0` (mặc định)
+- `anthropic.claude-3-haiku-20240307-v1:0`
 
 ## Cấu hình AWS
 
@@ -133,6 +148,12 @@ Sau khi chạy lệnh trên, giao diện web sẽ được mở trong trình duy
 - Phát hiện cảnh cắt: Các frame được lưu dưới dạng file JPG với tên theo định dạng `scene_XXXX.jpg`
 - Phân tích AWS Bedrock: Kết quả phân tích được lưu dưới dạng file JSON
 
+## Xử lý lỗi
+
+- Nếu không thể kết nối với AWS Bedrock, chương trình sẽ hiển thị thông báo lỗi và hướng dẫn kiểm tra cấu hình AWS
+- Nếu mô hình Claude được chỉ định không khả dụng, chương trình sẽ gợi ý các mô hình thay thế
+- Giao diện web hiển thị thông báo lỗi chi tiết và hướng dẫn khắc phục
+
 ## Ứng dụng
 
 - Tạo bộ dữ liệu hình ảnh từ video
@@ -140,3 +161,4 @@ Sau khi chạy lệnh trên, giao diện web sẽ được mở trong trình duy
 - Tạo thumbnails hoặc preview cho video
 - Xử lý và phân tích hình ảnh từ video
 - Phát hiện và phân đoạn cảnh trong video
+- Phân tích sản phẩm trong video quảng cáo
