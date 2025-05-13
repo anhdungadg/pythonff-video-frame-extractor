@@ -10,7 +10,7 @@ from io import BytesIO
 from PIL import Image
 
 # Constants
-DEFAULT_MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
+DEFAULT_MODEL_ID = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
 DEFAULT_REGION = 'us-east-1'
 
 def detect_scene_changes(video_path, output_folder, threshold=30, min_scene_length=15):
@@ -133,8 +133,15 @@ def detect_scene_changes_nova_pro(video_path, output_folder, threshold=0.35, min
     # Load Nova Pro model
     try:
         print("Loading Nova Pro model...")
-        processor = AutoImageProcessor.from_pretrained("nomic-ai/nomic-embed-vision-v1.5")
-        model = AutoModel.from_pretrained("nomic-ai/nomic-embed-vision-v1.5")
+        processor = AutoImageProcessor.from_pretrained(
+            "nomic-ai/nomic-embed-vision-v1.5",
+            trust_remote_code=True,
+            use_fast=True
+        )
+        model = AutoModel.from_pretrained(
+            "nomic-ai/nomic-embed-vision-v1.5",
+            trust_remote_code=True
+        )
         
         # Check if CUDA is available
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -315,8 +322,8 @@ def get_image_description(image, bedrock_client, model_id=DEFAULT_MODEL_ID):
         
         # Check for specific model-related errors and provide helpful message
         if "ValidationException" in error_message and "model ID" in error_message:
-            available_models = ["anthropic.claude-3-sonnet-20240229-v1:0", 
-                               "anthropic.claude-3-haiku-20240307-v1:0"]
+            available_models = ["us.amazon.nova-premier-v1:0", 
+                               "us.amazon.nova-pro-v1:0"]
             return f"Error: The specified model is not available. Try one of these models instead: {', '.join(available_models)}"
         
         return f"Error: {error_message}"

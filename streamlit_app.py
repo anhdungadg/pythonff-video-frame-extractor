@@ -8,10 +8,11 @@ from frame_extractor import extract_frames, analyze_video_frames, get_bedrock_cl
 from scene_detector import detect_scene_changes, detect_scene_changes_nova_pro, detect_scene_changes_bedrock
 
 # Constants
-DEFAULT_MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
+DEFAULT_MODEL_ID = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
 AVAILABLE_MODELS = [
-    'anthropic.claude-3-sonnet-20240229-v1:0',
-    'anthropic.claude-3-haiku-20240307-v1:0'
+    'us.amazon.nova-premier-v1:0',
+    'us.amazon.nova-pro-v1:0',
+    'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
 ]
 
 st.set_page_config(

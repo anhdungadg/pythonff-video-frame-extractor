@@ -9,7 +9,7 @@ from PIL import Image
 from io import BytesIO
 
 # Constants
-DEFAULT_MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
+DEFAULT_MODEL_ID = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
 DEFAULT_REGION = 'us-east-1'
 
 def extract_frames(video_path, output_folder, percentage):
@@ -100,54 +100,56 @@ def get_bedrock_client(region=DEFAULT_REGION):
         return None
 
 
-def analyze_image_with_bedrock(image_path, bedrock_client, model_id=DEFAULT_MODEL_ID, prompt=None):
+def analyze_images_with_bedrock(image_paths, bedrock_client, model_id=DEFAULT_MODEL_ID, prompt=None):
     """
-    Analyze a single image using AWS Bedrock
+    Analyze multiple images using AWS Bedrock
     
     Args:
-        image_path (str): Path to the image file
+        image_paths (list): List of paths to image files
         bedrock_client: AWS Bedrock client
         model_id (str): Bedrock model ID to use
         prompt (str): Custom prompt for analysis
         
     Returns:
-        str: Analysis result or error message
+        list: List of analysis results or error messages
     """
     if not bedrock_client:
-        return "Error: No Bedrock client available"
+        return ["Error: No Bedrock client available"] * len(image_paths)
     
     try:
-        # Convert image to base64
-        with open(image_path, 'rb') as image_file:
-            image_bytes = image_file.read()
-        
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        # Convert all images to base64
+        image_contents = []
+        for image_path in image_paths:
+            with open(image_path, 'rb') as image_file:
+                image_bytes = image_file.read()
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            image_contents.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64_image
+                }
+            })
         
         # Default prompt if none provided
         if not prompt:
-            prompt = "Describe what you see in this image in a concise way, focusing on the main subjects, setting, and action."
+            prompt = "For each image, describe what you see in a concise way, focusing on the main subjects, setting, and action. Number your responses to match the order of the images."
+        
+        # Add text prompt as the last content item
+        image_contents.append({
+            "type": "text",
+            "text": prompt
+        })
         
         # Prepare request body
         body = json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1000,
+            "max_tokens": 2000,  # Increased token limit for multiple images
             "messages": [
                 {
                     "role": "user", 
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": base64_image
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
+                    "content": image_contents
                 }
             ]
         })
@@ -160,19 +162,43 @@ def analyze_image_with_bedrock(image_path, bedrock_client, model_id=DEFAULT_MODE
         
         # Parse response
         response_body = json.loads(response.get('body').read())
-        return response_body['content'][0]['text']
+        analysis_text = response_body['content'][0]['text']
+        
+        # Split the analysis text into individual frame analyses
+        # This assumes the model returns numbered responses
+        analyses = []
+        lines = analysis_text.split('\n')
+        current_analysis = []
+        
+        for line in lines:
+            if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')):
+                if current_analysis:
+                    analyses.append('\n'.join(current_analysis))
+                current_analysis = [line]
+            elif current_analysis:
+                current_analysis.append(line)
+        
+        if current_analysis:
+            analyses.append('\n'.join(current_analysis))
+            
+        # If we couldn't parse the response properly, return the whole text for each frame
+        if len(analyses) != len(image_paths):
+            return [analysis_text] * len(image_paths)
+            
+        return analyses
         
     except Exception as e:
         error_message = str(e)
-        print(f"Error analyzing image: {error_message}")
+        print(f"Error analyzing images: {error_message}")
         
         # Check for specific model-related errors and provide helpful message
         if "ValidationException" in error_message and "model ID" in error_message:
-            available_models = ["anthropic.claude-3-sonnet-20240229-v1:0", 
-                               "anthropic.claude-3-haiku-20240307-v1:0"]
-            return f"Error: The specified model is not available. Try one of these models instead: {', '.join(available_models)}"
+            available_models = ["us.amazon.nova-premier-v1:0", 
+                               "us.amazon.nova-pro-v1:0",
+                               "us.anthropic.claude-3-7-sonnet-20250219-v1:0"]
+            return [f"Error: The specified model is not available. Try one of these models instead: {', '.join(available_models)}"] * len(image_paths)
         
-        return f"Error: {error_message}"
+        return [f"Error: {error_message}"] * len(image_paths)
 
 
 def analyze_video_frames(output_folder, model_id=DEFAULT_MODEL_ID, custom_prompt=None):
@@ -196,22 +222,22 @@ def analyze_video_frames(output_folder, model_id=DEFAULT_MODEL_ID, custom_prompt
     frames = [f for f in os.listdir(output_folder) if f.endswith('.jpg')]
     frames.sort()
     
-    results = []
+    # Get full paths for all frames
+    frame_paths = [os.path.join(output_folder, frame) for frame in frames]
     
-    # Process each frame with progress bar
-    pbar = tqdm(frames, desc="Analyzing frames")
+    print(f"Analyzing {len(frames)} frames in a single request...")
     
-    for frame in pbar:
-        frame_path = os.path.join(output_folder, frame)
-        pbar.set_description(f"Analyzing {frame}")
-        
-        # Analyze the image
-        analysis = analyze_image_with_bedrock(frame_path, bedrock, model_id, custom_prompt)
-        
-        results.append({
+    # Analyze all frames at once
+    analyses = analyze_images_with_bedrock(frame_paths, bedrock, model_id, custom_prompt)
+    
+    # Combine results
+    results = [
+        {
             'frame': frame,
             'analysis': analysis
-        })
+        }
+        for frame, analysis in zip(frames, analyses)
+    ]
             
     return results
 
